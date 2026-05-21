@@ -1,0 +1,29 @@
+# dbt
+target/
+dbt_packages/
+logs/
+*.log
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.Python
+*.egg-info/
+dist/
+build/
+
+# Credentials — never commit keys
+*.json
+!packages.json
+profiles.yml
+.env
+.env.*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp

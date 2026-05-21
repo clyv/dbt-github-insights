@@ -1,0 +1,20 @@
+version: 2
+
+models:
+  - name: mart_daily_repo_activity
+    description: >
+      Daily push activity per repo (partitioned). Primary analyst-facing
+      table for repo-level trends.
+    meta:
+      owner: "@clyv"
+      data_domain: developer_activity
+      refresh_cadence: daily partition
+
+  - name: mart_contributor_summary
+    description: >
+      Contributor-level push summary with first/last seen timestamps and
+      bot classification.
+    meta:
+      owner: "@clyv"
+      data_domain: developer_activity
+      refresh_cadence: daily partition

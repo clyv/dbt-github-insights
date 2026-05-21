@@ -1,0 +1,43 @@
+version: 2
+models:
+  - name: stg_push_events
+    description: >
+      Typed staging view for PushEvent rows from a single GitHub Archive day
+      partition. Renames columns, casts types, extracts payload fields.
+    config:
+      meta:
+        owner: "@clyv"
+        data_domain: developer_activity
+        refresh_cadence: daily partition
+    columns:
+      - name: event_id
+        description: Unique GitHub event identifier.
+        tests:
+          - unique
+          - not_null
+          - dbt_expectations.expect_column_values_to_match_regex:
+              arguments:
+                regex: "^[0-9]+$"
+                is_raw: true
+      - name: occurred_at
+        description: Event timestamp (UTC).
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: "'2020-01-01'"
+                max_value: "'2025-12-31'"
+                row_condition: "occurred_at is not null"
+      - name: actor_login
+        description: GitHub username of the actor.
+        tests:
+          - not_null
+      - name: push_commit_count
+        description: Number of commits in the push (from payload.size).
+        tests:
+        
+    tests:
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          arguments:
+            min_value: 10000
+            max_value: 5000000

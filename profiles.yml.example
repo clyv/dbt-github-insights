@@ -1,0 +1,15 @@
+# Copy to ~/.dbt/profiles.yml (or set DBT_PROFILES_DIR) and fill in values.
+# Do NOT commit profiles.yml or service-account JSON keys.
+
+github_archive:
+  target: dev
+  outputs:
+    dev:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: github_archive_dbt
+      threads: 4
+      timeout_seconds: 300
+      location: US
+      keyfile: "{{ env_var('GCP_SERVICE_ACCOUNT_KEY_PATH') }}"

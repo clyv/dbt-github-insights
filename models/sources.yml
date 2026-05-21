@@ -1,0 +1,13 @@
+version: 2
+
+sources:
+  - name: githubarchive
+    description: >
+      Public GitHub Archive dataset on BigQuery. Each table is one UTC day
+      (YYYYMMDD). Scope MVP to a few months — see docs/exploration.md.
+    database: githubarchive
+    schema: day
+    tables:
+      - name: events
+        identifier: "{{ var('partition_date') }}"
+        description: "Daily partition of raw GitHub events (e.g. 20240101)."

@@ -1,0 +1,13 @@
+version: 2
+
+models:
+  - name: stg_watch_events
+    description: Staging view for WatchEvent (star) rows.
+    meta:
+      owner: "@clyv"
+      data_domain: developer_activity
+      refresh_cadence: daily partition
+    columns:
+      - name: event_id
+        tests:
+          - not_null

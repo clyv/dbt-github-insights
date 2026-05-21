@@ -1,0 +1,36 @@
+version: 2
+
+models:
+  - name: int_events_deduped
+    description: >
+      All staged event types unioned and deduplicated on event_id. Handles
+      midnight boundary duplicates across adjacent day partitions.
+    meta:
+      owner: "@clyv"
+      data_domain: developer_activity
+      refresh_cadence: daily partition
+
+  - name: int_repo_names_normalized
+    description: >
+      Parses repo slugs into owner/name, flags valid org/repo format, trims
+      and lowercases names for consistent joins.
+    meta:
+      owner: "@clyv"
+      data_domain: developer_activity
+      refresh_cadence: daily partition
+
+  - name: int_events_with_keys
+    description: Surrogate key on event_id + occurred_at for safe joins.
+    meta:
+      owner: "@clyv"
+      data_domain: developer_activity
+      refresh_cadence: daily partition
+
+  - name: py_actor_login_cleaned
+    description: >
+      Python model classifying bot/CI actors via multi-pattern regex and
+      emitting actor_login_clean. Chosen over chained SQL regex for readability.
+    meta:
+      owner: "@clyv"
+      data_domain: developer_activity
+      refresh_cadence: daily partition
