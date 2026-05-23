@@ -1,13 +1,11 @@
 version: 2
 
+# Local mode: staging models read {{ ref('raw_github_events') }} after `dbt seed`.
+# BigQuery GitHub Archive can be wired here later when cloud is enabled.
+
 sources:
-  - name: githubarchive
-    description: >
-      Public GitHub Archive dataset on BigQuery. Each table is one UTC day
-      (YYYYMMDD). Scope MVP to a few months — see docs/exploration.md.
-    database: githubarchive
-    schema: day
+  - name: local_github
+    description: Sample GitHub Archive–shaped events loaded via seeds/raw_github_events.csv
     tables:
       - name: events
-        identifier: "{{ var('partition_date') }}"
-        description: "Daily partition of raw GitHub events (e.g. 20240101)."
+        identifier: raw_github_events

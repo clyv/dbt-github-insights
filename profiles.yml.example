@@ -1,15 +1,10 @@
-# Copy to ~/.dbt/profiles.yml (or set DBT_PROFILES_DIR) and fill in values.
-# Do NOT commit profiles.yml or service-account JSON keys.
+# Copy to profiles.yml in this repo and set DBT_PROFILES_DIR to the repo root, e.g.:
+#   PowerShell: $env:DBT_PROFILES_DIR = "C:\Users\gejuj\dbt-github-insights"
 
 github_archive:
-  target: dev
+  target: local
   outputs:
-    dev:
-      type: bigquery
-      method: service-account
-      project: "{{ env_var('GCP_PROJECT_ID') }}"
-      dataset: github_archive_dbt
+    local:
+      type: duckdb
+      path: data/github_archive.duckdb
       threads: 4
-      timeout_seconds: 300
-      location: US
-      keyfile: "{{ env_var('GCP_SERVICE_ACCOUNT_KEY_PATH') }}"

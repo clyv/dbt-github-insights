@@ -1,5 +1,4 @@
-# Pin versions after verifying in your venv: pip install -r requirements.txt
-dbt-bigquery==1.8.2
-pandas
-google-cloud-bigquery[pandas]==3.27.0
-pyarrow==17.0.0
+# Install in venv: pip install -r requirements.txt
+# Versions must match (dbt-core ships with dbt-duckdb).
+dbt-duckdb==1.9.6
+pandas==2.2.3

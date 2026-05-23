@@ -18,8 +18,14 @@ build/
 *.json
 !packages.json
 profiles.yml
+.user.yml
 .env
 .env.*
+
+# Local DuckDB database
+data/
+*.duckdb
+*.duckdb.wal
 
 # OS / IDE
 .DS_Store

@@ -16,19 +16,26 @@ clean-targets:
   - dbt_packages
 
 vars:
-  # Single-day partition for MVP; extend via docs/exploration.md scope notes.
-  partition_date: "20240101"
-  exploration_start_date: "2024-01-01"
-  exploration_end_date: "2024-03-31"
+  use_local_seed: true
+
+seeds:
+  github_archive:
+    raw_github_events:
+      +column_types:
+        id: varchar
+        type: varchar
+        created_at: varchar
+        actor_login: varchar
+        actor_id: varchar
+        repo_name: varchar
+        repo_id: varchar
+        payload: varchar
 
 models:
   github_archive:
     staging:
       +materialized: view
-      +schema: staging
     intermediate:
       +materialized: table
-      +schema: intermediate
     marts:
       +materialized: table
-      +schema: marts

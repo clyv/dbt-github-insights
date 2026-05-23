@@ -26,10 +26,10 @@ models:
       data_domain: developer_activity
       refresh_cadence: daily partition
 
-  - name: py_actor_login_cleaned
+  - name: int_actor_login_cleaned
     description: >
-      Python model classifying bot/CI actors via multi-pattern regex and
-      emitting actor_login_clean. Chosen over chained SQL regex for readability.
+      Classifies bot/CI actors via regex and emits actor_login_clean. SQL
+      implementation for local DuckDB (no cloud); same logic as a Python model.
     meta:
       owner: "@clyv"
       data_domain: developer_activity

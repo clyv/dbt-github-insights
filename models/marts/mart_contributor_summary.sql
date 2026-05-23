@@ -5,7 +5,7 @@ select
     count(*) as total_push_events,
     min(occurred_at) as first_seen_at,
     max(occurred_at) as last_seen_at
-from {{ ref('py_actor_login_cleaned') }}
+from {{ ref('int_actor_login_cleaned') }}
 where is_valid_slug = true
     and event_type = 'PushEvent'
 group by 1, 2
