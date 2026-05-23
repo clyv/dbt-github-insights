@@ -1,9 +1,36 @@
-# GitHub Archive — data exploration (Phase 1)
+# Phase 1 — Data profile
 
-Run these in the **BigQuery console** against public data before changing models.
-Replace dates with your chosen scope (MVP: one day `20240101`; portfolio: 3–6 months).
+Exploration against **local seed** (`seeds/raw_github_events.csv`) and **BigQuery** queries to run when cloud is enabled.
 
-## Sanity check — event types
+## Local seed profile (computed)
+
+| Metric | Value |
+|--------|-------|
+| Total raw rows | 21 |
+| Unique `event_id` (after dedup) | 20 |
+| PushEvent | 16 (76%) |
+| PullRequestEvent | 2 (10%) |
+| WatchEvent | 3 (14%) |
+| Null `actor_login` | 0 (0%) |
+| Bot-like actors (`[bot]`, `-bot`, `^bot-`) | 3 (dependabot\[bot\], renovate-bot, snyk-bot) |
+| CI-like actors (travis-ci pattern) | 1 |
+| Distinct `repo_name` | 5 |
+| Invalid slug (not `org/repo`) | 1 (`bad-repo-no-slash`, 5%) |
+| Time range | 2024-01-01 10:00 → 2024-01-03 09:00 UTC |
+| Scope decision | **3 days** of sample data locally; pipeline designed to scale to **3–6 months** on BigQuery day partitions |
+
+Reproduce locally after `dbt seed`:
+
+```sql
+-- Run in DuckDB (data/github_archive.duckdb) or dbt compile + query
+select type, count(*) as cnt from raw_github_events group by 1;
+```
+
+## BigQuery exploration (when cloud enabled)
+
+Run in the **BigQuery console** against public data. MVP day: `20240101`; portfolio scope: 3–6 months of `githubarchive.day.YYYYMMDD` tables.
+
+### Sanity check — event types
 
 ```sql
 SELECT type, COUNT(*) AS cnt
@@ -15,7 +42,7 @@ LIMIT 20;
 
 **Record results:** PushEvent ~___%, PullRequestEvent ~___%, WatchEvent ~___%.
 
-## Bot / null actor logins
+### Bot / null actor logins
 
 ```sql
 SELECT
@@ -31,9 +58,7 @@ SELECT
 FROM `githubarchive.day.20240101`;
 ```
 
-**Fill in after run:** null % = ___ , bot-like % = ___
-
-## Repo name cardinality & malformed slugs
+### Repo name cardinality & malformed slugs
 
 ```sql
 SELECT
@@ -43,23 +68,18 @@ SELECT
 FROM `githubarchive.day.20240101`;
 ```
 
-## Time range & volume (single day vs month)
+### Time range & volume
 
 ```sql
--- Single day
 SELECT
   MIN(created_at) AS min_ts,
   MAX(created_at) AS max_ts,
   COUNT(*) AS row_count
 FROM `githubarchive.day.20240101`;
-
--- Example month scope (adjust table wildcard / union as needed)
--- SELECT COUNT(*) FROM `githubarchive.day.202401*`;
 ```
 
-**Scope decision:** Modelling ___ months of ___ (document bytes processed in README).
+**Scope decision for BigQuery:** Model **3 months** of 2024 (Jan–Mar) — enough for portfolio lineage without scanning multi-TB history.
 
-## Partition size note
+### Cost note
 
-Query cost for public `githubarchive` under 1 TB/month free tier is usually **$0** for exploration-sized scans.
-Always check **bytes processed** in the BQ job details before scaling to full-year unions.
+Public `githubarchive` queries under **1 TB/month** free tier are typically **$0**. Check bytes processed in job details before scaling.

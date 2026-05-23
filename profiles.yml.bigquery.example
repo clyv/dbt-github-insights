@@ -1,0 +1,27 @@
+# BigQuery profile (optional — enable when using cloud)
+
+Copy to `%USERPROFILE%\.dbt\profiles.yml` or merge as a second target `bigquery`.
+
+```yaml
+github_archive:
+  target: local
+  outputs:
+    local:
+      type: duckdb
+      path: data/github_archive.duckdb
+      threads: 4
+
+    bigquery:
+      type: bigquery
+      method: service-account
+      project: "{{ env_var('GCP_PROJECT_ID') }}"
+      dataset: github_archive_dbt
+      threads: 4
+      timeout_seconds: 300
+      location: US
+      keyfile: "{{ env_var('GCP_SERVICE_ACCOUNT_KEY_PATH') }}"
+```
+
+Switch target: `dbt run --target bigquery`
+
+Staging SQL for BigQuery uses nested fields (`actor.login`, `JSON_VALUE`, `SAFE_OFFSET`) — see `docs/bigquery_staging_snippets.md`.

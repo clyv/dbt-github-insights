@@ -41,7 +41,6 @@ models:
               arguments:
                 min_value: 1
                 max_value: 5000
-                mostly: 0.99
                 row_condition: "push_commit_count is not null"
 
     tests:
