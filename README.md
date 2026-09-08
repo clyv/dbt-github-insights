@@ -71,30 +71,50 @@ Designed to scale to **3–6 months** of `githubarchive.day.*` partitions. The
 layer boundaries, tests and marts carry over unchanged; the staging model bodies
 are rewritten against the BigQuery schema (see below).
 
-## How to run (local, no cloud)
+## Run it yourself — locally, no account needed
+
+Everything below runs on your machine against a 21-row seed. No GCP project, no
+billing, no service account key, no network calls after `dbt deps`. It takes
+about two minutes.
 
 ```powershell
-cd path\to\dbt-github-insights
+git clone https://github.com/clyv/dbt-github-insights.git
+cd dbt-github-insights
+
 py -3 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 
 $env:DBT_PROFILES_DIR = (Get-Location).Path
-copy profiles.yml.example profiles.yml   # if missing
+copy profiles.yml.example profiles.yml
 mkdir data                               # DuckDB will not create the parent dir
 
 dbt deps
-dbt build          # seed + run + test in dependency order
-dbt docs generate
-dbt docs serve
+dbt build                                # seed + run + test, in dependency order
 ```
 
-Expected result on a clean checkout:
+You should see exactly this:
 
 ```
 Finished running 1 seed, 6 table models, 48 data tests, 3 view models
 Completed successfully
 Done. PASS=58 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=58
+```
+
+If you get anything else, that is a bug in this repo — please open an issue.
+
+Then explore what you just built:
+
+```powershell
+dbt docs generate
+dbt docs serve                           # interactive DAG, column docs, test coverage
+python scripts/validate_bigquery_sql.py  # parses every BigQuery branch, no account needed
+```
+
+Query the marts directly if you prefer SQL to a browser:
+
+```powershell
+python -c "import duckdb; print(duckdb.connect('data/github_archive.duckdb', read_only=True).sql('select * from mart_daily_repo_activity order by 1'))"
 ```
 
 ## Test strategy
@@ -177,41 +197,80 @@ See [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) for per-phase completion.
 - [x] Phases 2–4, 6–7, 9
 - [x] Phase 5 Python model (`int_actor_login_cleaned.py`, green locally)
 - [x] Phase 8 lineage (Mermaid DAG above, generated from the manifest)
-- [ ] Phase 0 GCP account — **the only step left, and it needs a human**:
-      account creation, billing and a credential file. Everything else on the
-      cloud path is done and validated. See [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md).
+- [ ] Phase 0 GCP account — **deliberately left to you.** Every part of the cloud
+      path that can be built without an account is done and dialect-validated;
+      what remains is creating *your own* GCP project, enabling billing and
+      downloading a service account key. That is not something this repo can
+      ship, and not something you should accept from anyone else.
+      → [Steps](#run-it-against-the-real-archive--your-own-gcp-account) · [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md)
 
-## Enabling BigQuery
+## Run it against the real archive — your own GCP account
 
-The models are dual-target: staging and `int_repo_names_normalized` branch on
-`target.type`, so no model bodies are edited to switch.
+The local path above proves the pipeline works. This path points it at the
+actual `githubarchive.day.*` tables, which is where it gets expensive and where
+you need your own account.
+
+**Why you have to do this part yourself:** it means creating a Google Cloud
+project, attaching a billing account and downloading a service account key.
+Those are your credentials and your bill. No repo should ship them, and you
+should be suspicious of any that offers to.
+
+### 1. Set up GCP (one time, manual)
+
+1. Create a GCP project and enable the **BigQuery API**
+2. Create a service account and grant it **BigQuery Job User** + **BigQuery Data Viewer**
+3. Download the JSON key somewhere outside this repo
+4. Set the environment variables listed in [`.env.example`](.env.example):
+   `GCP_PROJECT_ID` and `GCP_SERVICE_ACCOUNT_KEY_PATH`
+
+### 2. Point dbt at it
 
 ```powershell
 pip install dbt-bigquery
-# merge the bigquery target from profiles.yml.bigquery.example into profiles.yml
+# merge the `bigquery` target from profiles.yml.bigquery.example into profiles.yml
+```
+
+### 3. Run it — pinned to a single day
+
+```powershell
 dbt build --target bigquery --vars '{partition_date: "20240101"}'
 ```
 
-What is genuinely done: every model has a BigQuery branch, the source is defined
-and pinned to one day partition, `mart_daily_repo_activity` picks up
-`partition_by` on the cloud target, and the whole test suite is dialect-neutral.
+No model bodies change. Staging and `int_repo_names_normalized` branch on
+`target.type`, so the same DAG that ran on DuckDB runs on BigQuery.
 
-What is genuinely not: **none of it has ever run.** There is no GCP project, so
-the BigQuery branches are parsed, not executed:
+**Start pinned to one day and check the bytes billed before widening.**
+`githubarchive.day.*` is billed per byte scanned, and a wildcard across the full
+history is a multi-terabyte scan. The source is deliberately pinned to a single
+partition via that var so an accidental full scan takes real effort.
+
+### What to expect the first time
+
+Being straight with you: **none of the BigQuery path has ever been executed.**
+There is no GCP project behind this repo. Every BigQuery branch is parsed
+against the BigQuery dialect —
 
 ```powershell
 python scripts/validate_bigquery_sql.py
 # 8 model(s) parse as valid BigQuery SQL.
 ```
 
-That catches syntax and dialect errors. It does not catch a wrong column name in
-`githubarchive.day.*`, and it says nothing about query cost. Treat the first
-cloud run as a real test, pinned to one day.
+— and that catches syntax and dialect mistakes, but parsing is not running. A
+column name that does not exist in `githubarchive.day.*` would pass that check
+and fail on the real table. Treat your first run as the actual test.
 
-Two things will need adjusting on that run: the `stg_push_events` row count
-floor (tuned for 21 seed rows, should be ~10,000 for real partitions), and the
-Python model, which needs Dataproc Serverless rather than plain BigQuery — see
-`profiles.yml.bigquery.example`.
+Two things will need adjusting when you do:
+
+- **The row count floor.** `stg_push_events` asserts at least 5 rows, tuned for
+  a 21-row seed. Raise it to ~10,000 for real partitions.
+- **The Python model.** `int_actor_login_cleaned.py` needs Dataproc Serverless,
+  not just BigQuery — a subnet with Private Google Access and
+  `roles/dataproc.worker` on the service account. If you would rather not
+  provision that, the SQL equivalent is in
+  [`docs/bigquery_staging_snippets.md`](docs/bigquery_staging_snippets.md).
+
+If you get it running, the numbers in the **Data profile** table above are the
+ones to replace with real partition stats.
 
 ## License
 
