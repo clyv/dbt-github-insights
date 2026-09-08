@@ -55,4 +55,23 @@ REGEXP_CONTAINS(repo_name, r'^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$') AS is_valid_slu
 ) }}
 ```
 
-Use `COUNTIF(is_bot_actor = FALSE)` instead of DuckDB `count(*) filter (where ...)`.
+No change needed to the aggregation itself — `mart_daily_repo_activity` uses
+portable `sum(case when ... then 1 else 0 end)` rather than DuckDB's
+`count(*) filter (where ...)`, which BigQuery does not support.
+
+## int_events_deduped (BigQuery)
+
+No change needed. The dedupe uses `QUALIFY`, which both DuckDB and BigQuery
+support, rather than a `row_number()` CTE followed by a star-exclusion
+(`EXCLUDE` on DuckDB, `EXCEPT` on BigQuery — the two dialects disagree).
+
+## int_actor_login_cleaned (BigQuery)
+
+```sql
+REGEXP_CONTAINS(actor_login, r'(?i)(\[bot\]$|-bot$|^bot-)') AS is_bot_actor,
+REGEXP_CONTAINS(actor_login, r'(?i)^(travis|circleci|dependabot|renovate|snyk)') AS is_ci_actor,
+LOWER(TRIM(actor_login)) AS actor_login_clean
+```
+
+BigQuery has no case-insensitivity flag argument, so the `(?i)` inline flag
+replaces DuckDB's third `regexp_matches(..., 'i')` parameter.

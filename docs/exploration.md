@@ -12,8 +12,9 @@ Exploration against **local seed** (`seeds/raw_github_events.csv`) and **BigQuer
 | PullRequestEvent | 2 (10%) |
 | WatchEvent | 3 (14%) |
 | Null `actor_login` | 0 (0%) |
-| Bot-like actors (`[bot]`, `-bot`, `^bot-`) | 3 (dependabot\[bot\], renovate-bot, snyk-bot) |
-| CI-like actors (travis-ci pattern) | 1 |
+| Bot-like actors (`is_bot_actor`: `[bot]`, `-bot`, `^bot-`) | 3 (dependabot\[bot\], renovate-bot, snyk-bot) |
+| CI-vendor actors (`is_ci_actor`: travis, circleci, dependabot, renovate, snyk) | 4 (travis-ci + the three above — the two patterns deliberately overlap) |
+| Automated events excluded from `human_events` (bot **or** CI) | 4 of 20 deduped (20%) |
 | Distinct `repo_name` | 5 |
 | Invalid slug (not `org/repo`) | 1 (`bad-repo-no-slash`, 5%) |
 | Time range | 2024-01-01 10:00 → 2024-01-03 09:00 UTC |

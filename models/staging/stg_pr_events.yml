@@ -2,12 +2,50 @@ version: 2
 
 models:
   - name: stg_pr_events
-    description: Staging view for PullRequestEvent rows.
+    description: >
+      Staging view for PullRequestEvent rows. Same column contract as the other
+      staging models so int_events_deduped can union them directly.
     meta:
       owner: "@clyv"
       data_domain: developer_activity
       refresh_cadence: daily partition
     columns:
       - name: event_id
+        description: GitHub event identifier. Not unique at this layer.
         tests:
           - not_null
+          - dbt_expectations.expect_column_values_to_match_regex:
+              arguments:
+                regex: "^[0-9]+$"
+                is_raw: true
+
+      - name: occurred_at
+        description: Event timestamp (UTC).
+        tests:
+          - not_null
+          - dbt_expectations.expect_column_values_to_be_between:
+              arguments:
+                min_value: "'2020-01-01'"
+                max_value: "'2030-12-31'"
+
+      - name: actor_login
+        description: GitHub username of the actor.
+        tests:
+          - mostly_not_null:
+              arguments:
+                threshold: 0.98
+
+      - name: pr_action
+        description: >
+          Pull request action from payload.action. Deliberately not constrained
+          with accepted_values -- GitHub emits a long and growing list
+          (opened, closed, reopened, synchronize, labeled, review_requested...)
+          and pinning it here would break on the first real partition.
+        tests:
+          - not_null
+
+    tests:
+      - dbt_expectations.expect_table_row_count_to_be_between:
+          arguments:
+            min_value: 1
+            max_value: 100000

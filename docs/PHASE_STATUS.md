@@ -8,7 +8,7 @@
 | **3** | Staging layer | **Done** | `stg_push_events`, `stg_pr_events`, `stg_watch_events` + `sources.yml`. Reads local seed; BQ snippets in `docs/bigquery_staging_snippets.md`. |
 | **4** | Intermediate layer | **Done** | `int_events_deduped`, `int_repo_names_normalized`, `int_events_with_keys` with `dbt_utils.generate_surrogate_key`. |
 | **5** | Python model | **Partial** | Implemented as **`int_actor_login_cleaned.sql`** for DuckDB (no cloud Python runtime). Original `py_actor_login_cleaned.py` pattern documented in README for BigQuery resume. |
-| **6** | dbt-expectations tests | **Done** | Column + table tests on `stg_push_events`; `mostly` thresholds via singular tests in `tests/`. |
+| **6** | dbt-expectations tests | **Done** | Strict + volume tests across all three staging models, intermediate and marts; `mostly` thresholds via custom generic tests in `macros/` (`dbt_expectations` has no `mostly:` argument). |
 | **7** | Mart layer | **Done** | `mart_daily_repo_activity`, `mart_contributor_summary`. DuckDB-compatible SQL; BQ partition config documented. |
 | **8** | Documentation & lineage | **Partial** | Model descriptions + `meta` blocks in YAML. Run `dbt docs generate && dbt docs serve` locally for lineage screenshot. |
 | **9** | README & portfolio | **Done** | README structured per portfolio template below. |
@@ -25,4 +25,4 @@ You can demo: **seed → staging → intermediate → actor cleaning → tests g
 4. Swap staging SQL using `docs/bigquery_staging_snippets.md`  
 5. Restore `py_actor_login_cleaned.py` (optional differentiation)  
 6. Run Phase 1 BigQuery queries and update exploration doc with real stats  
-7. Raise `expect_table_row_count` min to 10,000 for production partitions  
+7. Raise `expect_table_row_count` min to 10,000 for production partitions (the `mostly_*` generic tests need no change — portable SQL, no `FILTER` clause)  

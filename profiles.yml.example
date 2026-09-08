@@ -1,5 +1,5 @@
 # Copy to profiles.yml in this repo and set DBT_PROFILES_DIR to the repo root, e.g.:
-#   PowerShell: $env:DBT_PROFILES_DIR = "C:\Users\gejuj\dbt-github-insights"
+#   PowerShell: $env:DBT_PROFILES_DIR = (Get-Location).Path
 
 github_archive:
   target: local

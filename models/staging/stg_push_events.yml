@@ -4,16 +4,17 @@ models:
   - name: stg_push_events
     description: >
       Typed staging view for PushEvent rows from local seed data (or BigQuery
-      when cloud is enabled).
+      when cloud is enabled). Staging preserves the raw event stream as-is,
+      duplicates included -- uniqueness is asserted downstream in
+      int_events_deduped, after the midnight boundary dedupe runs.
     meta:
       owner: "@clyv"
       data_domain: developer_activity
       refresh_cadence: daily partition
     columns:
       - name: event_id
-        description: Unique GitHub event identifier.
+        description: GitHub event identifier. Not unique at this layer.
         tests:
-          - unique
           - not_null
           - dbt_expectations.expect_column_values_to_match_regex:
               arguments:
@@ -30,18 +31,26 @@ models:
                 max_value: "'2030-12-31'"
 
       - name: actor_login
-        description: GitHub username of the actor.
+        description: >
+          GitHub username of the actor. Deleted accounts and anonymised events
+          leave this null in the real archive, so it is asserted
+          probabilistically rather than with a hard not_null.
         tests:
-          - not_null
+          - mostly_not_null:
+              arguments:
+                threshold: 0.98
 
       - name: push_commit_count
-        description: Number of commits in the push (from payload.size).
+        description: >
+          Number of commits in the push (from payload.size). Force-push and
+          import events produce genuine outliers, so the range is asserted
+          probabilistically.
         tests:
-          - dbt_expectations.expect_column_values_to_be_between:
+          - mostly_between:
               arguments:
                 min_value: 1
                 max_value: 5000
-                row_condition: "push_commit_count is not null"
+                threshold: 0.995
 
     tests:
       - dbt_expectations.expect_table_row_count_to_be_between:

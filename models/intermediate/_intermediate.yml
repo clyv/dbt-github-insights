@@ -4,11 +4,26 @@ models:
   - name: int_events_deduped
     description: >
       All staged event types unioned and deduplicated on event_id. Handles
-      midnight boundary duplicates across adjacent day partitions.
+      midnight boundary duplicates across adjacent day partitions. This is the
+      first model in the DAG where event_id is guaranteed unique, so the
+      uniqueness assertion lives here rather than in staging.
     meta:
       owner: "@clyv"
       data_domain: developer_activity
       refresh_cadence: daily partition
+    columns:
+      - name: event_id
+        description: GitHub event identifier, unique after dedupe.
+        tests:
+          - unique
+          - not_null
+      - name: event_type
+        description: Source event type this row was staged from.
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ["PushEvent", "PullRequestEvent", "WatchEvent"]
 
   - name: int_repo_names_normalized
     description: >
@@ -18,6 +33,15 @@ models:
       owner: "@clyv"
       data_domain: developer_activity
       refresh_cadence: daily partition
+    columns:
+      - name: repo_name_clean
+        description: Lowercased, trimmed repo slug.
+        tests:
+          - not_null
+      - name: is_valid_slug
+        description: True when repo_name matches the owner/name format.
+        tests:
+          - not_null
 
   - name: int_events_with_keys
     description: Surrogate key on event_id + occurred_at for safe joins.
@@ -25,6 +49,12 @@ models:
       owner: "@clyv"
       data_domain: developer_activity
       refresh_cadence: daily partition
+    columns:
+      - name: surrogate_key
+        description: Hash of event_id + occurred_at.
+        tests:
+          - unique
+          - not_null
 
   - name: int_actor_login_cleaned
     description: >
@@ -34,3 +64,18 @@ models:
       owner: "@clyv"
       data_domain: developer_activity
       refresh_cadence: daily partition
+    columns:
+      - name: is_bot_actor
+        description: True when the actor login matches a bot naming pattern.
+        tests:
+          - not_null
+      - name: is_ci_actor
+        description: True when the actor login matches a known CI vendor.
+        tests:
+          - not_null
+      - name: actor_login_clean
+        description: Lowercased, trimmed actor login.
+        tests:
+          - mostly_not_null:
+              arguments:
+                threshold: 0.98

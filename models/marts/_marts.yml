@@ -9,12 +9,73 @@ models:
       owner: "@clyv"
       data_domain: developer_activity
       refresh_cadence: daily partition
+    columns:
+      - name: event_date
+        description: UTC date of the push events.
+        tests:
+          - not_null
+      - name: repo_owner
+        description: Owner half of the repo slug.
+        tests:
+          - not_null
+      - name: repo_slug
+        description: Name half of the repo slug.
+        tests:
+          - not_null
+      - name: total_events
+        description: Push events on this repo/date.
+        tests:
+          - not_null
+      - name: human_events
+        description: Push events excluding both bot accounts and CI vendors.
+        tests:
+          - not_null
+
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns:
+              - event_date
+              - repo_owner
+              - repo_slug
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "total_events > 0"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "human_events <= total_events"
 
   - name: mart_contributor_summary
     description: >
       Contributor-level push summary with first/last seen timestamps and
-      bot classification.
+      bot classification. Grain is one row per cleaned actor login.
     meta:
       owner: "@clyv"
       data_domain: developer_activity
       refresh_cadence: daily partition
+    columns:
+      - name: actor_login_clean
+        description: Lowercased, trimmed actor login. Grain of this table.
+        tests:
+          - unique
+          - not_null
+      - name: is_bot_actor
+        description: True when the actor login matches a bot naming pattern.
+        tests:
+          - not_null
+      - name: is_ci_actor
+        description: True when the actor login matches a known CI vendor.
+        tests:
+          - not_null
+      - name: total_push_events
+        description: Push events attributed to this contributor.
+        tests:
+          - not_null
+
+    tests:
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "unique_repos_contributed > 0"
+      - dbt_utils.expression_is_true:
+          arguments:
+            expression: "last_seen_at >= first_seen_at"

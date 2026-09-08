@@ -1,4 +1,9 @@
 # Install in venv: pip install -r requirements.txt
-# Versions must match (dbt-core ships with dbt-duckdb).
+#
+# dbt-core is pinned explicitly. Pinning only the adapter lets dbt-core float
+# to whatever is current, which is how this project silently moved from 1.11
+# to 1.12 between runs.
+dbt-core==1.12.3
 dbt-duckdb==1.9.6
+duckdb==1.5.5
 pandas==2.2.3
