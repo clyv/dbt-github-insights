@@ -1,3 +1,12 @@
+{#
+    On BigQuery the mart is partitioned on event_date so downstream reads scan
+    one day rather than the whole table. DuckDB has no partitioning, so the
+    config is target-conditional rather than unconditional.
+#}
+{% if target.type == 'bigquery' %}
+{{ config(partition_by={'field': 'event_date', 'data_type': 'date'}) }}
+{% endif %}
+
 -- Daily push activity per repo.
 --
 -- human_events excludes both bot accounts (dependabot[bot], *-bot) and CI

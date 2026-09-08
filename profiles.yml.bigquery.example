@@ -1,6 +1,10 @@
-# BigQuery profile (optional — enable when using cloud)
-
-Copy to `%USERPROFILE%\.dbt\profiles.yml` or merge as a second target `bigquery`.
+# BigQuery profile (optional — enable when a GCP project exists)
+#
+# Copy into profiles.yml alongside the `local` target. The models branch on
+# target.type, so no model bodies need editing:
+#
+#   dbt build                      -> DuckDB + seed
+#   dbt build --target bigquery    -> BigQuery + githubarchive.day.*
 
 ```yaml
 github_archive:
@@ -20,8 +24,30 @@ github_archive:
       timeout_seconds: 300
       location: US
       keyfile: "{{ env_var('GCP_SERVICE_ACCOUNT_KEY_PATH') }}"
+
+      # Required only for the Python model (int_actor_login_cleaned), which
+      # runs on Dataproc Serverless rather than in BigQuery itself. The subnet
+      # needs Private Google Access enabled, and the service account needs
+      # roles/dataproc.worker.
+      gcs_bucket: "{{ env_var('GCP_DATAPROC_BUCKET') }}"
+      dataproc_region: us-central1
+      submission_method: serverless
 ```
 
-Switch target: `dbt run --target bigquery`
+## Cost control
 
-Staging SQL for BigQuery uses nested fields (`actor.login`, `JSON_VALUE`, `SAFE_OFFSET`) — see `docs/bigquery_staging_snippets.md`.
+`githubarchive.day.*` is billed per byte scanned. The source is pinned to a
+single partition via a var rather than a wildcard:
+
+```powershell
+dbt build --target bigquery --vars '{partition_date: "20240101"}'
+```
+
+Widen deliberately (`20240101` → a date range) once the query cost per day is
+known. A wildcard over the full history is a multi-terabyte scan.
+
+## Status
+
+The BigQuery branches in the models are written against the documented archive
+schema but have **not** been executed — no GCP project is provisioned. Treat
+the first cloud run as a real test, starting with `--vars` pinned to one day.

@@ -21,6 +21,7 @@ profiles.yml
 .user.yml
 .env
 .env.*
+!.env.example
 
 # Local DuckDB database
 data/

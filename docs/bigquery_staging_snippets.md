@@ -1,6 +1,13 @@
 # BigQuery staging snippets (Phase 3 — cloud target)
 
-Use these in staging models when `target.name == 'bigquery'`. Current repo uses DuckDB + flat seed columns for local dev.
+**These are now implemented in the models themselves**, inside
+`{% if target.type == 'bigquery' %}` branches — they no longer need to be
+copied anywhere. This file is kept as the reference for *why* each translation
+is what it is, and as the place to work out new ones.
+
+Validate any change here against the BigQuery dialect without a GCP project:
+
+    python scripts/validate_bigquery_sql.py
 
 ## stg_push_events (BigQuery)
 

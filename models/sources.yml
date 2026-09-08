@@ -1,11 +1,27 @@
 version: 2
 
-# Local mode: staging models read {{ ref('raw_github_events') }} after `dbt seed`.
-# BigQuery GitHub Archive can be wired here later when cloud is enabled.
+# Two sources, one per target.
+#
+#   local (DuckDB)  -> staging reads {{ ref('raw_github_events') }} after `dbt seed`
+#   bigquery        -> staging reads {{ source('githubarchive', 'events') }}
+#
+# Staging models branch on target.type, so switching is `dbt build --target bigquery`
+# rather than hand-editing model bodies.
 
 sources:
   - name: local_github
-    description: Sample GitHub Archive–shaped events loaded via seeds/raw_github_events.csv
+    description: Sample GitHub Archive-shaped events loaded via seeds/raw_github_events.csv
     tables:
       - name: events
         identifier: raw_github_events
+
+  - name: githubarchive
+    description: >
+      Public GitHub Archive day partitions. Billed per byte scanned, so always
+      select a bounded partition via the partition_date var rather than a
+      wildcard over the full history.
+    database: githubarchive
+    schema: day
+    tables:
+      - name: events
+        identifier: "{{ var('partition_date', '20240101') }}"

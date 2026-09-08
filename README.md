@@ -4,27 +4,56 @@ A dbt project that turns **GitHub Archive** event data into clean, tested analyt
 
 ## Why it matters
 
-The public GitHub Archive is **multi-terabyte**; most tutorials never touch real scale. This repo shows how to **scope sensibly** (days/months, not the full history), model event types separately in staging, dedupe midnight boundary duplicates, classify bot actors, and enforce **probabilistic** quality tests (`mostly`-style thresholds). It runs **locally on DuckDB** today and documents the exact switch to **BigQuery + optional Python models** when you enable cloud.
+The public GitHub Archive is **multi-terabyte**; most tutorials never touch real scale. This repo shows how to **scope sensibly** (days/months, not the full history), model event types separately in staging, dedupe midnight boundary duplicates, classify bot actors, and enforce **probabilistic** quality tests (`mostly`-style thresholds). It runs **locally on DuckDB** today — including a real dbt **Python model** — and the models are dual-target, so enabling **BigQuery** is a target flag rather than a rewrite.
 
 ## Architecture
 
-```
-seeds/raw_github_events.csv          ← local dev (BigQuery githubarchive.day.* when cloud on)
-        │
-        ▼
-  stg_push_events / stg_pr_events / stg_watch_events   (views)
-        │
-        ▼
-  int_events_deduped → int_repo_names_normalized → int_events_with_keys   (tables)
-        │
-        ▼
-  int_actor_login_cleaned   (table — SQL locally; Python optional on BigQuery)
-        │
-        ├──► mart_daily_repo_activity
-        └──► mart_contributor_summary
+```mermaid
+flowchart TD
+    seed[("raw_github_events<br/>seed &mdash; githubarchive.day.* on BigQuery")]
+
+    subgraph staging["staging (views)"]
+        push["stg_push_events"]
+        pr["stg_pr_events"]
+        watch["stg_watch_events"]
+    end
+
+    subgraph intermediate["intermediate (tables)"]
+        dedupe["int_events_deduped<br/><small>midnight boundary dedupe</small>"]
+        repos["int_repo_names_normalized"]
+        keys["int_events_with_keys"]
+        actors["int_actor_login_cleaned<br/><small>Python model</small>"]
+    end
+
+    subgraph marts["marts (tables)"]
+        daily["mart_daily_repo_activity"]
+        contrib["mart_contributor_summary"]
+    end
+
+    seed --> push
+    seed --> pr
+    seed --> watch
+    push --> dedupe
+    pr --> dedupe
+    watch --> dedupe
+    dedupe --> repos
+    repos --> keys
+    keys --> actors
+    actors --> daily
+    actors --> contrib
+
+    style actors fill:#7c3aed,stroke:#5b21b6,color:#fff
 ```
 
-> **Lineage screenshot:** After `dbt docs generate`, run `dbt docs serve` and capture the DAG for your portfolio README.
+`int_actor_login_cleaned` is a **dbt Python model** (highlighted above), executed
+in-process by dbt-duckdb locally. Everything else is SQL.
+
+For the interactive version with column-level docs and test coverage:
+
+```powershell
+dbt docs generate
+dbt docs serve
+```
 
 ## Data profile (local seed)
 
@@ -120,7 +149,8 @@ asserting that the problem this pipeline exists to solve does not occur.
 | **DuckDB + seed first** | Full DAG and tests without GCP billing, keys, or network during development. |
 | **Custom `mostly_*` generic tests** | `dbt_expectations` has no `mostly:` argument — it was never ported from Great Expectations, so `mostly:` fails with `takes no keyword argument 'mostly'` on any version. Rather than write one singular test per column, `macros/test_mostly_not_null.sql` and `macros/test_mostly_between.sql` recover the ergonomics as reusable generic tests. Both use portable SQL (no `FILTER` clause) so they run unchanged on DuckDB and BigQuery. |
 | **Uniqueness asserted after dedupe** | Raw GitHub Archive partitions contain midnight boundary duplicates by design, so `unique` on `event_id` belongs on `int_events_deduped`, not staging. |
-| **SQL actor cleaning locally** | Same regex semantics as the planned Python model; avoids BigQuery Python runtime on Windows. Restore `py_actor_login_cleaned.py` on cloud for the SQL+Python hybrid narrative. |
+| **Actor cleaning as a Python model** | The bot and CI-vendor rules are a maintained list, not a fixed expression — in SQL every addition edits a regex literal inside a CASE. dbt-duckdb runs Python models in-process, so this is real and tested locally, not aspirational. It is the only Python in the DAG. |
+| **Dual-target models, not doc snippets** | Staging and `int_repo_names_normalized` branch on `target.type`, so enabling cloud is `--target bigquery` rather than hand-copying SQL out of a markdown file and hoping it still matches. |
 | **Intermediate as tables, staging as views** | Cheap fresh staging; materialize heavier transforms once. |
 | **One staging model per event type** | Clear lineage and simpler downstream joins. |
 | **Repo name `dbt-github-insights`** | Public portfolio repo (plan suggested `dbt-github-archive`; same purpose). |
@@ -129,11 +159,12 @@ asserting that the problem this pipeline exists to solve does not occur.
 
 ```
 models/
-  sources.yml
-  staging/       stg_*_events.sql + .yml
-  intermediate/  int_* + int_actor_login_cleaned.sql
+  sources.yml    local_github (seed) + githubarchive (BigQuery)
+  staging/       stg_*_events.sql + .yml  -- dual-target
+  intermediate/  int_*.sql + int_actor_login_cleaned.py  -- Python model
   marts/         mart_*.sql + _marts.yml
 macros/          mostly_not_null + mostly_between generic tests
+scripts/         validate_bigquery_sql.py
 seeds/           raw_github_events.csv
 docs/            exploration.md, PHASE_STATUS.md, bigquery_staging_snippets.md
 ```
@@ -142,35 +173,45 @@ docs/            exploration.md, PHASE_STATUS.md, bigquery_staging_snippets.md
 
 See [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md) for per-phase completion.
 
-- [x] Phases 2–4, 6–7, 9 (local)
 - [x] Phase 1 profile (local seed)
-- [ ] Phase 0 GCP (skipped — optional)
-- [ ] Phase 5 Python model on BigQuery (documented, not required locally)
-- [ ] Phase 8 lineage screenshot in README
+- [x] Phases 2–4, 6–7, 9
+- [x] Phase 5 Python model (`int_actor_login_cleaned.py`, green locally)
+- [x] Phase 8 lineage (Mermaid DAG above, generated from the manifest)
+- [ ] Phase 0 GCP account — **the only step left, and it needs a human**:
+      account creation, billing and a credential file. Everything else on the
+      cloud path is done and validated. See [docs/PHASE_STATUS.md](docs/PHASE_STATUS.md).
 
-## Enabling BigQuery later
+## Enabling BigQuery
 
-Honest scope: this is not a one-line target switch. The **shape** of the project
-carries over — layer boundaries, materializations, test suite, mart logic — but
-the three staging model bodies are rewritten, because the archive schema is
-nested (`actor.login`) where the seed is flat, and the JSON and cast functions
-differ.
+The models are dual-target: staging and `int_repo_names_normalized` branch on
+`target.type`, so no model bodies are edited to switch.
 
-What changes:
+```powershell
+pip install dbt-bigquery
+# merge the bigquery target from profiles.yml.bigquery.example into profiles.yml
+dbt build --target bigquery --vars '{partition_date: "20240101"}'
+```
 
-1. Follow `profiles.yml.bigquery.example` and `pip install dbt-bigquery`
-2. Rewrite the three `stg_*_events.sql` bodies using `docs/bigquery_staging_snippets.md`
-   (`actor.login` vs flat, `JSON_VALUE` vs `json_extract_string`, `INT64` vs `bigint`)
-3. Rewrite the `regexp_matches` calls in `int_repo_names_normalized` and
-   `int_actor_login_cleaned` as `REGEXP_CONTAINS` (snippets provided)
-4. Add the `partition_by` config to `mart_daily_repo_activity`
-5. Raise the `stg_push_events` row count floor to ~10,000
-6. Run the exploration queries in `docs/exploration.md` and update the profile table
-7. Optional: add `models/intermediate/py_actor_login_cleaned.py` per original Phase 5 spec
+What is genuinely done: every model has a BigQuery branch, the source is defined
+and pinned to one day partition, `mart_daily_repo_activity` picks up
+`partition_by` on the cloud target, and the whole test suite is dialect-neutral.
 
-What does **not** change: `int_events_deduped` (uses `QUALIFY`), both marts
-(portable `sum(case ...)` rather than `FILTER`), and the whole test suite
-including the `mostly_*` generic tests — all written in SQL both engines accept.
+What is genuinely not: **none of it has ever run.** There is no GCP project, so
+the BigQuery branches are parsed, not executed:
+
+```powershell
+python scripts/validate_bigquery_sql.py
+# 8 model(s) parse as valid BigQuery SQL.
+```
+
+That catches syntax and dialect errors. It does not catch a wrong column name in
+`githubarchive.day.*`, and it says nothing about query cost. Treat the first
+cloud run as a real test, pinned to one day.
+
+Two things will need adjusting on that run: the `stg_push_events` row count
+floor (tuned for 21 seed rows, should be ~10,000 for real partitions), and the
+Python model, which needs Dataproc Serverless rather than plain BigQuery — see
+`profiles.yml.bigquery.example`.
 
 ## License
 

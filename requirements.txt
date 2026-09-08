@@ -7,3 +7,8 @@ dbt-core==1.12.3
 dbt-duckdb==1.9.6
 duckdb==1.5.5
 pandas==2.2.3
+
+# Dev only: scripts/validate_bigquery_sql.py parses the BigQuery branches of
+# the dual-target models without needing a GCP project. jinja2 already ships
+# with dbt-core.
+sqlglot==30.18.0
