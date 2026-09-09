@@ -10,7 +10,7 @@
 | **5** | Python model | **Done** | `int_actor_login_cleaned.py` is a real dbt Python model, executed in-process by dbt-duckdb and green in `dbt build`. Bot/CI classification is a maintained vendor list rather than a buried regex literal. The Dataproc/PySpark branch is written inline but unexecuted — see Phase 0. |
 | **6** | dbt-expectations tests | **Done** | Strict + volume tests across all three staging models, the intermediate layer and both marts; `mostly` thresholds via custom generic tests in `macros/` (`dbt_expectations` has no `mostly:` argument). 48 data tests. |
 | **7** | Mart layer | **Done** | `mart_daily_repo_activity`, `mart_contributor_summary`. Portable `sum(case ...)` aggregation; BigQuery `partition_by` applied conditionally on target. |
-| **8** | Documentation & lineage | **Done** | Model descriptions + `meta` blocks throughout. Lineage is a Mermaid DAG rendered inline in the README, generated from `target/manifest.json` — it renders on GitHub without a committed screenshot and cannot go stale silently. `dbt docs serve` gives the interactive version. |
+| **8** | Documentation & lineage | **Done** | Model descriptions + `meta` blocks throughout. Lineage is a Mermaid DAG inline in the README — it renders on GitHub, diffs like code, and needs no committed screenshot. It is hand-maintained, so `scripts/check_lineage_diagram.py` compares its edges against `target/manifest.json` and fails on drift. `dbt docs serve` gives the interactive version. |
 | **9** | README & portfolio | **Done** | README carries the DAG, the data profile, the test strategy and the honest BigQuery scope. |
 
 ## What runs today
