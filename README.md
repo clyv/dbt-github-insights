@@ -103,18 +103,30 @@ Done. PASS=58 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=58
 
 If you get anything else, that is a bug in this repo — please open an issue.
 
-Then explore what you just built:
+Look at what you just built:
+
+```powershell
+dbt show --select mart_daily_repo_activity --limit 10
+dbt show --select mart_contributor_summary --limit 10
+```
+
+```
+| event_date | repo_owner  | repo_slug | total_events | human_events | total_commits |
+| ---------- | ----------- | --------- | ------------ | ------------ | ------------- |
+| 2024-01-01 | acme        | widget    |            4 |            2 |             7 |
+| 2024-01-02 | open-source | lib       |            3 |            3 |            11 |
+```
+
+`total_events` 4 vs `human_events` 2 on `acme/widget` is the bot and CI
+filtering doing its job — a `dependabot[bot]` push and a `travis-ci` push.
+
+The rest of the tooling, none of which needs an account:
 
 ```powershell
 dbt docs generate
-dbt docs serve                           # interactive DAG, column docs, test coverage
-python scripts/validate_bigquery_sql.py  # parses every BigQuery branch, no account needed
-```
-
-Query the marts directly if you prefer SQL to a browser:
-
-```powershell
-python -c "import duckdb; print(duckdb.connect('data/github_archive.duckdb', read_only=True).sql('select * from mart_daily_repo_activity order by 1'))"
+dbt docs serve                            # interactive DAG, column docs, test coverage
+python scripts/validate_bigquery_sql.py   # parses every BigQuery branch
+python scripts/check_lineage_diagram.py   # asserts the README DAG matches the manifest
 ```
 
 ## Test strategy
@@ -184,7 +196,7 @@ models/
   intermediate/  int_*.sql + int_actor_login_cleaned.py  -- Python model
   marts/         mart_*.sql + _marts.yml
 macros/          mostly_not_null + mostly_between generic tests
-scripts/         validate_bigquery_sql.py
+scripts/         validate_bigquery_sql.py, check_lineage_diagram.py
 seeds/           raw_github_events.csv
 docs/            exploration.md, PHASE_STATUS.md, bigquery_staging_snippets.md
 ```
